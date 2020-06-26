@@ -355,6 +355,15 @@ config VIDEO_LCD_SSD2828
 	interface for driving a MIPI compatible LCD panel. It uses SPI for
 	configuration.
 
+config ST7789V
+	bool "ST7789V bridge chip"
+	default n
+	---help---
+	Support for the ST7789v bridge chip, which can take pixel data coming
+	from a parallel LCD interface and translate it on the fly into MIPI DSI
+	interface for driving a MIPI compatible LCD panel. It uses SPI for
+	configuration.
+
 config VIDEO_LCD_SSD2828_TX_CLK
 	int "SSD2828 TX_CLK frequency (in MHz)"
 	depends on VIDEO_LCD_SSD2828
