@@ -142,8 +142,8 @@
 				vsync-active = <1>;
 			};
 		};
-	}
-}
+	};
+};
 
 &ohci0 {
 	status = "okay";
