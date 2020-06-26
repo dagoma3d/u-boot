@@ -5,7 +5,7 @@
  *
  */
 #include <common.h>
-#include <backlight.h>
+// #include <backlight.h>
 #include <command.h>
 #include <display.h>
 #include <dm.h>
@@ -235,7 +235,7 @@ static const struct udevice_id st7789v_ids[] = {
 
 struct st7789v_lcd_priv {
 	struct display_timing timing;
-	struct udevice *backlight;
+	// struct udevice *backlight;
 	struct gpio_desc enable;
 	int panel_bpp;
 	u32 power_on_delay;
@@ -259,7 +259,7 @@ static int st7789v_lcd_enable(struct udevice *dev, int bpp,
 	int ret = 0;
 
 	dm_gpio_set_value(&priv->enable, 1);
-	ret = backlight_enable(priv->backlight);
+	// ret = backlight_enable(priv->backlight);
 
 	mdelay(priv->power_on_delay);
 	st7789v_spi_startup(slave);
@@ -277,12 +277,12 @@ static int st7789v_ofdata_to_platdata(struct udevice *dev)
 	struct st7789v_lcd_priv *priv = dev_get_priv(dev);
 	int ret;
 
-	ret = uclass_get_device_by_phandle(UCLASS_PANEL_BACKLIGHT, dev,
-					   "backlight", &priv->backlight);
-	if (ret) {
-		debug("%s: Cannot get backlight: ret=%d\n", __func__, ret);
-		return log_ret(ret);
-	}
+	// ret = uclass_get_device_by_phandle(UCLASS_PANEL_BACKLIGHT, dev,
+	// 				   "backlight", &priv->backlight);
+	// if (ret) {
+	// 	debug("%s: Cannot get backlight: ret=%d\n", __func__, ret);
+	// 	return log_ret(ret);
+	// }
 	ret = gpio_request_by_name(dev, "enable-gpios", 0, &priv->enable,
 				   GPIOD_IS_OUT);
 	if (ret) {
