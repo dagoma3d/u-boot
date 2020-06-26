@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * LCD: LG4573, TFT 4.3", 480x800, RGB24
+ * LCD: st7789v, TFT 2.8", 240x320, RGB24
  * LCD initialization via SPI
  *
  */
@@ -16,15 +16,36 @@
 #include <spi.h>
 #include <asm/gpio.h>
 #include <linux/delay.h>
+#include <mipi_display.h>
 
 #define PWR_ON_DELAY_MSECS  120
+#define HSD20_IPS 1
 
-static int lb043wv_spi_write_u16(struct spi_slave *slave, u16 val)
+enum st7789v_command {
+	PORCTRL = 0xB2,
+	GCTRL = 0xB7,
+	VCOMS = 0xBB,
+	VDVVRHEN = 0xC2,
+	VRHS = 0xC3,
+	VDVS = 0xC4,
+	VCMOFSET = 0xC5,
+	PWCTRL1 = 0xD0,
+	PVGAMCTRL = 0xE0,
+	NVGAMCTRL = 0xE1,
+};
+
+#define MADCTL_BGR BIT(3) /* bitmask for RGB/BGR order */
+#define MADCTL_MV BIT(5) /* bitmask for page/column order */
+#define MADCTL_MX BIT(6) /* bitmask for column address order */
+#define MADCTL_MY BIT(7) /* bitmask for page address order */
+
+
+static int spi_write_u8(struct spi_slave *slave, u8 val)
 {
-	unsigned short buf16 = htons(val);
+	unsigned short buf8 = htons(val);
 	int ret = 0;
 
-	ret = spi_xfer(slave, 16, &buf16, NULL,
+	ret = spi_xfer(slave, 8, &buf8, NULL,
 		       SPI_XFER_BEGIN | SPI_XFER_END);
 	if (ret)
 		debug("%s: Failed to send: %d\n", __func__, ret);
@@ -32,169 +53,128 @@ static int lb043wv_spi_write_u16(struct spi_slave *slave, u16 val)
 	return ret;
 }
 
-static void lb043wv_spi_write_u16_array(struct spi_slave *slave, u16 *buff,
+static void spi_write_u8_array(struct spi_slave *slave, u8 *buff,
 					int size)
 {
 	int i;
 
 	for (i = 0; i < size; i++)
-		lb043wv_spi_write_u16(slave, buff[i]);
+		spi_write_u8(slave, buff[i]);
 }
 
-static void lb043wv_display_mode_settings(struct spi_slave *slave)
+static void init_display(struct spi_slave *slave)
 {
-	static u16 display_mode_settings[] = {
-	  0x703A,
-	  0x7270,
-	  0x70B1,
-	  0x7208,
-	  0x723B,
-	  0x720F,
-	  0x70B2,
-	  0x7200,
-	  0x72C8,
-	  0x70B3,
-	  0x7200,
-	  0x70B4,
-	  0x7200,
-	  0x70B5,
-	  0x7242,
-	  0x7210,
-	  0x7210,
-	  0x7200,
-	  0x7220,
-	  0x70B6,
-	  0x720B,
-	  0x720F,
-	  0x723C,
-	  0x7213,
-	  0x7213,
-	  0x72E8,
-	  0x70B7,
-	  0x7246,
-	  0x7206,
-	  0x720C,
-	  0x7200,
-	  0x7200,
+	/* turn off sleep mode */
+	spi_write_u8(slave, MIPI_DCS_EXIT_SLEEP_MODE);
+	mdelay(120);
+
+	/* set pixel format to RGB-565 */
+	static u8 _pixel_format[] = {
+	  MIPI_DCS_SET_PIXEL_FORMAT,
+	  MIPI_DCS_PIXEL_FMT_16BIT,
+	};
+	spi_write_u8_array(slave, _pixel_format,
+				    ARRAY_SIZE(_pixel_format));
+	
+	static u8 _portctrl[] = {
+		PORCTRL, 
+		HSD20_IPS ? 0x05 : 0x08, 
+		HSD20_IPS ? 0x05 : 0x08, 
+		0x00, 
+		HSD20_IPS ? 0x33 : 0x22, 
+		HSD20_IPS ? 0x33 : 0x22,
 	};
 
-	debug("transfer display mode settings\n");
-	lb043wv_spi_write_u16_array(slave, display_mode_settings,
-				    ARRAY_SIZE(display_mode_settings));
-}
+	spi_write_u8_array(slave, _portctrl,
+				ARRAY_SIZE(_portctrl));
 
-static void lb043wv_power_settings(struct spi_slave *slave)
-{
-	static u16 power_settings[] = {
-	  0x70C0,
-	  0x7201,
-	  0x7211,
-	  0x70C3,
-	  0x7207,
-	  0x7203,
-	  0x7204,
-	  0x7204,
-	  0x7204,
-	  0x70C4,
-	  0x7212,
-	  0x7224,
-	  0x7218,
-	  0x7218,
-	  0x7202,
-	  0x7249,
-	  0x70C5,
-	  0x726F,
-	  0x70C6,
-	  0x7241,
-	  0x7263,
+	/*
+	 * VGH = 13.26V
+	 * VGL = -10.43V
+	 */
+	static u8 _gctrl[] = {
+		GCTRL, 
+		HSD20_IPS ? 0x75 : 0x35,
 	};
+	spi_write_u8_array(slave, _gctrl,
+				ARRAY_SIZE(_gctrl));
 
-	debug("transfer power settings\n");
-	lb043wv_spi_write_u16_array(slave, power_settings,
-				    ARRAY_SIZE(power_settings));
-}
-
-static void lb043wv_gamma_settings(struct spi_slave *slave)
-{
-	static u16 gamma_settings[] = {
-	  0x70D0,
-	  0x7203,
-	  0x7207,
-	  0x7273,
-	  0x7235,
-	  0x7200,
-	  0x7201,
-	  0x7220,
-	  0x7200,
-	  0x7203,
-	  0x70D1,
-	  0x7203,
-	  0x7207,
-	  0x7273,
-	  0x7235,
-	  0x7200,
-	  0x7201,
-	  0x7220,
-	  0x7200,
-	  0x7203,
-	  0x70D2,
-	  0x7203,
-	  0x7207,
-	  0x7273,
-	  0x7235,
-	  0x7200,
-	  0x7201,
-	  0x7220,
-	  0x7200,
-	  0x7203,
-	  0x70D3,
-	  0x7203,
-	  0x7207,
-	  0x7273,
-	  0x7235,
-	  0x7200,
-	  0x7201,
-	  0x7220,
-	  0x7200,
-	  0x7203,
-	  0x70D4,
-	  0x7203,
-	  0x7207,
-	  0x7273,
-	  0x7235,
-	  0x7200,
-	  0x7201,
-	  0x7220,
-	  0x7200,
-	  0x7203,
-	  0x70D5,
-	  0x7203,
-	  0x7207,
-	  0x7273,
-	  0x7235,
-	  0x7200,
-	  0x7201,
-	  0x7220,
-	  0x7200,
-	  0x7203,
+	/*
+	 * VDV and VRH register values come from command write
+	 * (instead of NVM)
+	 */
+	static u8 _vdvvrhen[] = {
+		VDVVRHEN, 
+		0x01, 
+		0xFF,
 	};
+	spi_write_u8_array(slave, _vdvvrhen,
+				ARRAY_SIZE(_vdvvrhen));
+	/*
+	 * VAP =  4.1V + (VCOM + VCOM offset + 0.5 * VDV)
+	 * VAN = -4.1V + (VCOM + VCOM offset + 0.5 * VDV)
+	 */
+	static u8 _vrhs[] = {
+		VRHS, 
+		HSD20_IPS ? 0x13 : 0x0B,
+	};
+	spi_write_u8_array(slave, _vrhs,
+			ARRAY_SIZE(_vrhs));
 
-	debug("transfer gamma settings\n");
-	lb043wv_spi_write_u16_array(slave, gamma_settings,
-				    ARRAY_SIZE(gamma_settings));
+	/* VDV = 0V */
+	static u8 _vdvs[] = {
+		VDVS, 
+		0x20,
+	};
+	spi_write_u8_array(slave, _vdvs,
+			ARRAY_SIZE(_vdvs));
+
+	/* VCOM = 0.9V */
+	static u8 _vcoms[] = {
+		VCOMS, 
+		HSD20_IPS ? 0x22: 0x20,
+	};
+	spi_write_u8_array(slave, _vcoms,
+			ARRAY_SIZE(_vcoms));
+
+	/* VCOM offset = 0V */
+	static u8 _vcmofset[] = {
+		VCMOFSET, 
+		0x20,
+	};
+	spi_write_u8_array(slave, _vcmofset,
+			ARRAY_SIZE(_vcmofset));
+
+	/*
+	 * AVDD = 6.8V
+	 * AVCL = -4.8V
+	 * VDS = 2.3V
+	 */
+	static u8 _pwctrl1[] = {
+		PWCTRL1, 
+		0xA4,
+		0xA1,
+	};
+	spi_write_u8_array(slave, _pwctrl1,
+			ARRAY_SIZE(_pwctrl1));
+
+	spi_write_u8(slave, MIPI_DCS_SET_DISPLAY_ON);
+
+	if (HSD20_IPS)
+		spi_write_u8(slave, MIPI_DCS_ENTER_INVERT_MODE);
 }
 
-static void lb043wv_display_on(struct spi_slave *slave)
-{
-	static u16 sleep_out = 0x7011;
-	static u16 display_on = 0x7029;
-
-	lb043wv_spi_write_u16(slave, sleep_out);
-	mdelay(PWR_ON_DELAY_MSECS);
-	lb043wv_spi_write_u16(slave, display_on);
+/**
+ * set_var() - apply LCD properties like rotation and BGR mode
+ *
+ * @par: FBTFT parameter object
+ *
+ * Return: 0 on success, < 0 if error occurred.
+ */
+static void set_var(struct spi_slave *slave){
 }
 
-static int lg4573_spi_startup(struct spi_slave *slave)
+static int st7789v_spi_startup(struct spi_slave *slave)
 {
 	int ret;
 
@@ -202,16 +182,14 @@ static int lg4573_spi_startup(struct spi_slave *slave)
 	if (ret)
 		return ret;
 
-	lb043wv_display_mode_settings(slave);
-	lb043wv_power_settings(slave);
-	lb043wv_gamma_settings(slave);
-	lb043wv_display_on(slave);
+	init_display(slave);
+	set_var(slave);
 
 	spi_release_bus(slave);
 	return 0;
 }
 
-static int do_lgset(struct cmd_tbl *cmdtp, int flag, int argc,
+static int do_sitronixset(struct cmd_tbl *cmdtp, int flag, int argc,
 		    char *const argv[])
 {
 	struct spi_slave *slave;
@@ -219,9 +197,9 @@ static int do_lgset(struct cmd_tbl *cmdtp, int flag, int argc,
 	int ret;
 
 	ret = uclass_get_device_by_driver(UCLASS_DISPLAY,
-					  DM_GET_DRIVER(lg4573_lcd), &dev);
+					  DM_GET_DRIVER(st7789v_lcd), &dev);
 	if (ret) {
-		printf("%s: Could not get lg4573 device\n", __func__);
+		printf("%s: Could not get st7789v device\n", __func__);
 		return ret;
 	}
 	slave = dev_get_parent_priv(dev);
@@ -229,33 +207,33 @@ static int do_lgset(struct cmd_tbl *cmdtp, int flag, int argc,
 		printf("%s: No slave data\n", __func__);
 		return -ENODEV;
 	}
-	lg4573_spi_startup(slave);
+	st7789v_spi_startup(slave);
 
 	return 0;
 }
 
 U_BOOT_CMD(
-	lgset,	2,	1,	do_lgset,
-	"set lgdisplay",
+	sitronixset,	2,	1,	do_sitronixset,
+	"set sitronixdisplay",
 	""
 );
 
-static int lg4573_bind(struct udevice *dev)
+static int st7789v_bind(struct udevice *dev)
 {
 	return 0;
 }
 
-static int lg4573_probe(struct udevice *dev)
+static int st7789v_probe(struct udevice *dev)
 {
 	return 0;
 }
 
-static const struct udevice_id lg4573_ids[] = {
-	{ .compatible = "lg,lg4573" },
+static const struct udevice_id st7789v_ids[] = {
+	{ .compatible = "sitronix,st7789v" },
 	{ }
 };
 
-struct lg4573_lcd_priv {
+struct st7789v_lcd_priv {
 	struct display_timing timing;
 	struct udevice *backlight;
 	struct gpio_desc enable;
@@ -263,40 +241,40 @@ struct lg4573_lcd_priv {
 	u32 power_on_delay;
 };
 
-static int lg4573_lcd_read_timing(struct udevice *dev,
+static int st7789v_lcd_read_timing(struct udevice *dev,
 				  struct display_timing *timing)
 {
-	struct lg4573_lcd_priv *priv = dev_get_priv(dev);
+	struct st7789v_lcd_priv *priv = dev_get_priv(dev);
 
 	memcpy(timing, &priv->timing, sizeof(struct display_timing));
 
 	return 0;
 }
 
-static int lg4573_lcd_enable(struct udevice *dev, int bpp,
+static int st7789v_lcd_enable(struct udevice *dev, int bpp,
 			     const struct display_timing *edid)
 {
 	struct spi_slave *slave = dev_get_parent_priv(dev);
-	struct lg4573_lcd_priv *priv = dev_get_priv(dev);
+	struct st7789v_lcd_priv *priv = dev_get_priv(dev);
 	int ret = 0;
 
 	dm_gpio_set_value(&priv->enable, 1);
 	ret = backlight_enable(priv->backlight);
 
 	mdelay(priv->power_on_delay);
-	lg4573_spi_startup(slave);
+	st7789v_spi_startup(slave);
 
 	return ret;
 };
 
-static const struct dm_display_ops lg4573_lcd_ops = {
-	.read_timing = lg4573_lcd_read_timing,
-	.enable = lg4573_lcd_enable,
+static const struct dm_display_ops st7789v_lcd_ops = {
+	.read_timing = st7789v_lcd_read_timing,
+	.enable = st7789v_lcd_enable,
 };
 
-static int lg4573_ofdata_to_platdata(struct udevice *dev)
+static int st7789v_ofdata_to_platdata(struct udevice *dev)
 {
-	struct lg4573_lcd_priv *priv = dev_get_priv(dev);
+	struct st7789v_lcd_priv *priv = dev_get_priv(dev);
 	int ret;
 
 	ret = uclass_get_device_by_phandle(UCLASS_PANEL_BACKLIGHT, dev,
@@ -319,13 +297,13 @@ static int lg4573_ofdata_to_platdata(struct udevice *dev)
 	return 0;
 }
 
-U_BOOT_DRIVER(lg4573_lcd) = {
-	.name   = "lg4573",
+U_BOOT_DRIVER(st7789v_lcd) = {
+	.name   = "st7789v",
 	.id     = UCLASS_DISPLAY,
-	.ops    = &lg4573_lcd_ops,
-	.ofdata_to_platdata	= lg4573_ofdata_to_platdata,
-	.of_match = lg4573_ids,
-	.bind   = lg4573_bind,
-	.probe  = lg4573_probe,
-	.priv_auto_alloc_size = sizeof(struct lg4573_lcd_priv),
+	.ops    = &st7789v_lcd_ops,
+	.ofdata_to_platdata	= st7789v_ofdata_to_platdata,
+	.of_match = st7789v_ids,
+	.bind   = st7789v_bind,
+	.probe  = st7789v_probe,
+	.priv_auto_alloc_size = sizeof(struct st7789v_lcd_priv),
 };
