@@ -32,6 +32,7 @@ obj-$(CONFIG_FSL_DIU_FB) += fsl_diu_fb.o videomodes.o
 obj-$(CONFIG_IHS_VIDEO_OUT) += ihs_video_out.o
 obj-$(CONFIG_LD9040) += ld9040.o
 obj-$(CONFIG_LG4573) += lg4573.o
+obj-$(CONFIG_ST7789V) += st7789v.o
 obj-$(CONFIG_LOGICORE_DP_TX) += logicore_dp_tx.o
 obj-$(CONFIG_NXP_TDA19988) += tda19988.o
 obj-$(CONFIG_OSD) += video_osd-uclass.o
