@@ -114,6 +114,37 @@
 	};
 };
 
+&spi1 {
+	status = "okay";
+
+	lcd_panel:display@0{
+		#address-cells = <1>;
+		#size-cells = <1>;
+		compatible = "sitronix,st7789v";
+		reg = <0>;
+		spi-max-frequency = <40000000>;
+		power-on-delay = <10>;
+		enable-gpios = <&pio 0 6 GPIO_ACTIVE_HIGH>;
+
+		display-timings {
+			240x320p57 {
+				native-mode;
+				clock-frequency = <27000027>;
+				hactive = <240>;
+				vactive = <320>;
+				hfront-porch = <10>;
+				hback-porch = <59>;
+				hsync-len = <10>;
+				vback-porch = <15>;
+				vfront-porch = <15>;
+				vsync-len = <15>;
+				hsync-active = <1>;
+				vsync-active = <1>;
+			};
+		};
+	}
+}
+
 &ohci0 {
 	status = "okay";
 };
