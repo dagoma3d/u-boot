@@ -4,6 +4,7 @@
  * LCD initialization via SPI
  *
  */
+#define DEBUG
 #include <common.h>
 // #include <backlight.h>
 #include <command.h>
@@ -196,7 +197,7 @@ static int do_sitronixset(struct cmd_tbl *cmdtp, int flag, int argc,
 	struct udevice *dev;
 	int ret;
 
-	ret = uclass_get_device_by_driver(UCLASS_DISPLAY,
+	ret = uclass_get_device_by_driver(UCLASS_VIDEO_CONSOLE,
 					  DM_GET_DRIVER(st7789v_lcd), &dev);
 	if (ret) {
 		printf("%s: Could not get st7789v device\n", __func__);
@@ -220,11 +221,13 @@ U_BOOT_CMD(
 
 static int st7789v_bind(struct udevice *dev)
 {
+	printf("%s: binding\n", __func__);
 	return 0;
 }
 
 static int st7789v_probe(struct udevice *dev)
 {
+	printf("%s: probing\n", __func__);
 	return 0;
 }
 
@@ -299,7 +302,7 @@ static int st7789v_ofdata_to_platdata(struct udevice *dev)
 
 U_BOOT_DRIVER(st7789v_lcd) = {
 	.name   = "st7789v",
-	.id     = UCLASS_DISPLAY,
+	.id     = UCLASS_VIDEO_CONSOLE,
 	.ops    = &st7789v_lcd_ops,
 	.ofdata_to_platdata	= st7789v_ofdata_to_platdata,
 	.of_match = st7789v_ids,
