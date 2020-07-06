@@ -261,6 +261,7 @@ static int sun4i_spi_parse_pins(struct udevice *dev)
 
 static inline int sun4i_spi_set_clock(struct udevice *dev, bool enable)
 {
+	printf("%s: setting clock \n", __func__);
 	struct sun4i_spi_priv *priv = dev_get_priv(dev);
 	int ret;
 
@@ -272,26 +273,30 @@ static inline int sun4i_spi_set_clock(struct udevice *dev, bool enable)
 		return 0;
 	}
 
+	printf("%s: clock ahb \n", __func__);
 	ret = clk_enable(&priv->clk_ahb);
 	if (ret) {
-		dev_err(dev, "failed to enable ahb clock (ret=%d)\n", ret);
+		printf("%s: failed to enable ahb clock (ret=%d)\n", __func__, ret);
 		return ret;
 	}
 
+	printf("%s: clock mod \n", __func__);
 	ret = clk_enable(&priv->clk_mod);
 	if (ret) {
-		dev_err(dev, "failed to enable mod clock (ret=%d)\n", ret);
+		printf("%s: failed to enable mod clock (ret=%d)\n",__func__, ret);
 		goto err_ahb;
 	}
 
+	printf("%s: clock reset \n", __func__);
 	if (reset_valid(&priv->reset)) {
 		ret = reset_deassert(&priv->reset);
 		if (ret) {
-			dev_err(dev, "failed to deassert reset\n");
+			printf("%s: failed to deassert reset\n",__func__);
 			goto err_mod;
 		}
 	}
 
+	printf("%s: finished\n", __func__);
 	return 0;
 
 err_mod:
@@ -303,6 +308,7 @@ err_ahb:
 
 static int sun4i_spi_claim_bus(struct udevice *dev)
 {
+	printf("%s: sun4i claiming... \n", __func__);
 	struct sun4i_spi_priv *priv = dev_get_priv(dev->parent);
 	int ret;
 
@@ -310,16 +316,20 @@ static int sun4i_spi_claim_bus(struct udevice *dev)
 	if (ret)
 		return ret;
 
+	printf("%s: sun4i claiming #1... \n", __func__);
 	setbits_le32(SPI_REG(priv, SPI_GCR), SUN4I_CTL_ENABLE |
 		     SUN4I_CTL_MASTER | SPI_BIT(priv, SPI_GCR_TP));
 
+	printf("%s: sun4i claiming #2... \n", __func__);
 	if (priv->variant->has_soft_reset)
 		setbits_le32(SPI_REG(priv, SPI_GCR),
 			     SPI_BIT(priv, SPI_GCR_SRST));
 
+	printf("%s: sun4i claiming #3... \n", __func__);
 	setbits_le32(SPI_REG(priv, SPI_TCR), SPI_BIT(priv, SPI_TCR_CS_MANUAL) |
 		     SPI_BIT(priv, SPI_TCR_CS_ACTIVE_LOW));
 
+	printf("%s: sun4i claiming finished... \n", __func__);
 	return 0;
 }
 
@@ -331,6 +341,7 @@ static int sun4i_spi_release_bus(struct udevice *dev)
 
 	sun4i_spi_set_clock(dev->parent, false);
 
+	printf("%s: sun4i spi release finished... \n", __func__);
 	return 0;
 }
 

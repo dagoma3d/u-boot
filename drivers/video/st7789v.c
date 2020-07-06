@@ -4,7 +4,6 @@
  * LCD initialization via SPI
  *
  */
-#define DEBUG
 #include <common.h>
 // #include <backlight.h>
 #include <command.h>
@@ -9660,7 +9659,7 @@ struct st7789v_lcd_priv {
 
 static int spi_write_u8(struct spi_slave *slave, u8 val)
 {
-	unsigned short buf8 = htons(val);
+	//unsigned short buf8 = htons(val);
 	int ret = 0;
 
 	ret = spi_xfer(slave, 8, &buf8, NULL,
@@ -9676,12 +9675,15 @@ static void spi_write_u8_array(struct spi_slave *slave, u8 *buff,
 {
 	int i;
 
+	printf("%s: Send: %d\n", __func__, buff[0]);
+
 	for (i = 0; i < size; i++)
 		spi_write_u8(slave, buff[i]);
 }
 
 static void init_display(struct spi_slave *slave)
 {
+	printf("%s: Init display... \n", __func__);
 	/* turn off sleep mode */
 	spi_write_u8(slave, MIPI_DCS_EXIT_SLEEP_MODE);
 	mdelay(120);
@@ -9785,6 +9787,7 @@ static void init_display(struct spi_slave *slave)
 static void fbtft_set_addr_win(struct spi_slave *slave, int xs, int ys, int xe,
 			       int ye)
 {
+	printf("%s: Setting addr... \n", __func__);
 	static u8 _caset[] = {
 		MIPI_DCS_SET_COLUMN_ADDRESS, 
 		0x00, 
@@ -9814,25 +9817,17 @@ static void fbtft_set_addr_win(struct spi_slave *slave, int xs, int ys, int xe,
 static void update_display(struct spi_slave *slave, struct udevice *dev)
 {
 	struct st7789v_lcd_priv *priv = dev_get_priv(dev);
+	printf("%s: Updating display... \n", __func__);
 
 	fbtft_set_addr_win(slave, 0, 0,
 			240 - 1, 320 - 1);
 
+	dm_gpio_set_value(&priv->enable, 1);
 	dm_gpio_set_value(&priv->dc, 1);
 	
 	spi_write_u8_array(slave, data,
 			ARRAY_SIZE(data));
 	
-}
-
-/**
- * set_var() - apply LCD properties like rotation and BGR mode
- *
- * @par: FBTFT parameter object
- *
- * Return: 0 on success, < 0 if error occurred.
- */
-static void set_var(struct spi_slave *slave){
 }
 
 static int st7789v_spi_startup(struct spi_slave *slave)
@@ -9845,7 +9840,6 @@ static int st7789v_spi_startup(struct spi_slave *slave)
 		return ret;
 
 	init_display(slave);
-	set_var(slave);
 
 	spi_release_bus(slave);
 	return 0;
@@ -9853,15 +9847,17 @@ static int st7789v_spi_startup(struct spi_slave *slave)
 
 static int display_logo(struct spi_slave *slave, struct udevice *dev)
 {
+	printf("%s: Displaying Logo \n", __func__);
 	int ret;
 
 	ret = spi_claim_bus(slave);
-	if (ret)
+	printf("%s: claim bus value: %d\n", __func__,ret);
+	if (ret){
 		printf("%s: Failed to claim bus: %d\n", __func__, ret);
 		return ret;
-
+	}
+	
 	init_display(slave);
-	set_var(slave);
 	update_display(slave,dev);
 
 	spi_release_bus(slave);
@@ -9886,7 +9882,11 @@ static int do_sitronixset(struct cmd_tbl *cmdtp, int flag, int argc,
 		printf("%s: No slave data\n", __func__);
 		return -ENODEV;
 	}
-	display_logo(slave,dev);
+	ret = display_logo(slave,dev);
+	if (ret) {
+		printf("%s: Could not display logo\n", __func__);
+		return ret;
+	}
 
 	return 0;
 }
@@ -9965,10 +9965,19 @@ static int st7789v_ofdata_to_platdata(struct udevice *dev)
 			return log_ret(ret);
 	}
 
+	ret = gpio_request_by_name(dev, "dc", 0, &priv->dc,
+				   GPIOD_IS_OUT);
+	if (ret) {
+		debug("%s: Warning: cannot get dc GPIO: ret=%d\n",
+		      __func__, ret);
+		if (ret != -ENOENT)
+			return log_ret(ret);
+	}
+
 	priv->power_on_delay = dev_read_u32_default(dev, "power-on-delay", 10);
 
 	return 0;
-}
+};
 
 U_BOOT_DRIVER(st7789v_lcd) = {
 	.name   = "st7789v",
