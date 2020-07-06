@@ -45,6 +45,16 @@
 		};
 	};
 
+	softspi1: soft-spi1 {
+		compatible = "spi-gpio";
+		status = "okay";
+		gpio-sck = <&pio 0 14 0>;
+		gpio-mosi = <&pio 0 15 0>;
+		gpio-miso = <&pio 0 16 0>;
+		cs-gpios = <&pio 0 13 0>;
+		num-chipselects = <1>;
+	};
+
 	reg_gmac_3v3: gmac-3v3 {
 		compatible = "regulator-fixed";
 		regulator-name = "gmac-3v3";
@@ -114,8 +124,7 @@
 	};
 };
 
-&spi1 {
-	status = "okay";
+&softspi1 {
 
 	lcd_panel:display@0{
 		#address-cells = <1>;
@@ -128,23 +137,6 @@
 		power-on-delay = <10>;
 		enable-gpios = <&pio 0 6 GPIO_ACTIVE_HIGH>;
 		dc = <&pio 0 7 GPIO_ACTIVE_HIGH>;
-
-		display-timings {
-			240x320p57 {
-				native-mode;
-				clock-frequency = <27000027>;
-				hactive = <240>;
-				vactive = <320>;
-				hfront-porch = <10>;
-				hback-porch = <59>;
-				hsync-len = <10>;
-				vback-porch = <15>;
-				vfront-porch = <15>;
-				vsync-len = <15>;
-				hsync-active = <1>;
-				vsync-active = <1>;
-			};
-		};
 	};
 };
 
