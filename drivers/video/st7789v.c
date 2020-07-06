@@ -9662,11 +9662,11 @@ static int spi_write_u8(struct spi_slave *slave, u8 val)
 	//unsigned short buf8 = htons(val);
 	int ret = 0;
 
-	ret = spi_xfer(slave, 8, &buf8, NULL,
+	ret = spi_xfer(slave, 8, val, NULL,
 		       SPI_XFER_BEGIN | SPI_XFER_END);
-	if (ret)
+	if (ret){
 		printf("%s: Failed to send: %d\n", __func__, ret);
-
+	}
 	return ret;
 }
 
@@ -9675,7 +9675,7 @@ static void spi_write_u8_array(struct spi_slave *slave, u8 *buff,
 {
 	int i;
 
-	printf("%s: Send: %d\n", __func__, buff[0]);
+	//printf("%s: Send: %d\n", __func__, buff[0]);
 
 	for (i = 0; i < size; i++)
 		spi_write_u8(slave, buff[i]);
@@ -9835,10 +9835,10 @@ static int st7789v_spi_startup(struct spi_slave *slave)
 	int ret;
 
 	ret = spi_claim_bus(slave);
-	if (ret)
+	if (ret){
 		printf("%s: Failed to claim bus: %d\n", __func__, ret);
 		return ret;
-
+	}
 	init_display(slave);
 
 	spi_release_bus(slave);
@@ -9877,7 +9877,10 @@ static int do_sitronixset(struct cmd_tbl *cmdtp, int flag, int argc,
 		printf("%s: Could not get st7789v device\n", __func__);
 		return ret;
 	}
+	
 	slave = dev_get_parent_priv(dev);
+	//slave = spi_setup_slave(1, 13, 32000000, 3);
+
 	if (!slave) {
 		printf("%s: No slave data\n", __func__);
 		return -ENODEV;
