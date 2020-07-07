@@ -9894,7 +9894,7 @@ static int st7789v_spi_startup(struct spi_slave *slave)
 	// init_display(slave);
 
 	// spi_release_bus(slave);
-	// return 0;
+	return 0;
 }
 
 static int display_logo(struct spi_slave *slave, struct udevice *dev)
