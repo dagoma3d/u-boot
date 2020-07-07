@@ -10013,7 +10013,7 @@ static int st7789v_ofdata_to_platdata(struct udevice *dev)
 			return log_ret(ret);
 	}
 
-	ret = gpio_request_by_name(dev, "dc", 0, &priv->dc,
+	ret = gpio_request_by_name(dev, "dc-gpios", 0, &priv->dc,
 				   GPIOD_IS_OUT);
 	if (ret) {
 		debug("%s: Warning: cannot get dc GPIO: ret=%d\n",
@@ -10022,10 +10022,10 @@ static int st7789v_ofdata_to_platdata(struct udevice *dev)
 			return log_ret(ret);
 	}
 
-	ret = gpio_request_by_name(dev, "reset", 0, &priv->reset,
+	ret = gpio_request_by_name(dev, "reset-gpios", 0, &priv->reset,
 				   GPIOD_IS_OUT);
 	if (ret) {
-		debug("%s: Warning: cannot get dc GPIO: ret=%d\n",
+		debug("%s: Warning: cannot get reset GPIO: ret=%d\n",
 		      __func__, ret);
 		if (ret != -ENOENT)
 			return log_ret(ret);
