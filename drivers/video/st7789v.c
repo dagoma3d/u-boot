@@ -9663,7 +9663,7 @@ static int spi_write_u8(struct spi_slave *slave, u8 val)
 	int ret = 0;
 
 	ret = spi_xfer(slave, 8, val, NULL,
-		       SPI_XFER_BEGIN | SPI_XFER_END);
+		       SPI_XFER_BEGIN);
 	if (ret){
 		printf("%s: Failed to send: %d\n", __func__, ret);
 	}
@@ -9813,21 +9813,38 @@ static void fbtft_set_addr_win(struct spi_slave *slave, int xs, int ys, int xe,
 	spi_write_u8(slave, MIPI_DCS_WRITE_MEMORY_START);
 }
 
+/**
+ * set_var() - apply LCD properties like rotation and BGR mode
+ *
+ * @par: FBTFT parameter object
+ *
+ * Return: 0 on success, < 0 if error occurred.
+ */
+static int set_var(struct spi_slave *slave)
+{
+	static u8 _madctl_par[] = {
+		MIPI_DCS_SET_ADDRESS_MODE, 
+		0x00, 
+	};
+
+	spi_write_u8_array(slave, _madctl_par, ARRAY_SIZE(_madctl_par));
+	return 0;
+}
+
 /* Inspired from fbtft_update_display function */
 static void update_display(struct spi_slave *slave, struct udevice *dev)
 {
 	struct st7789v_lcd_priv *priv = dev_get_priv(dev);
 	printf("%s: Updating display... \n", __func__);
 
-	fbtft_set_addr_win(slave, 0, 0,
+	fbtft_set_addr_win(slave, 50, 50,
 			240 - 1, 320 - 1);
 
 	dm_gpio_set_value(&priv->enable, 1);
-	dm_gpio_set_value(&priv->dc, 1);
+	// dm_gpio_set_value(&priv->dc, 1);
 	
 	spi_write_u8_array(slave, data,
 			ARRAY_SIZE(data));
-	
 }
 
 static int st7789v_spi_startup(struct spi_slave *slave)
@@ -9856,8 +9873,9 @@ static int display_logo(struct spi_slave *slave, struct udevice *dev)
 		printf("%s: Failed to claim bus: %d\n", __func__, ret);
 		return ret;
 	}
-	
+
 	init_display(slave);
+	set_var(slave);
 	update_display(slave,dev);
 
 	spi_release_bus(slave);
@@ -9935,7 +9953,6 @@ static int st7789v_lcd_enable(struct udevice *dev, int bpp,
 	int ret = 0;
 
 	dm_gpio_set_value(&priv->enable, 1);
-	// ret = backlight_enable(priv->backlight);
 
 	mdelay(priv->power_on_delay);
 	st7789v_spi_startup(slave);
@@ -9953,12 +9970,6 @@ static int st7789v_ofdata_to_platdata(struct udevice *dev)
 	struct st7789v_lcd_priv *priv = dev_get_priv(dev);
 	int ret;
 
-	// ret = uclass_get_device_by_phandle(UCLASS_PANEL_BACKLIGHT, dev,
-	// 				   "backlight", &priv->backlight);
-	// if (ret) {
-	// 	debug("%s: Cannot get backlight: ret=%d\n", __func__, ret);
-	// 	return log_ret(ret);
-	// }
 	ret = gpio_request_by_name(dev, "enable-gpios", 0, &priv->enable,
 				   GPIOD_IS_OUT);
 	if (ret) {
