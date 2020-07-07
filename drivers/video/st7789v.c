@@ -9664,7 +9664,7 @@ static int spi_write_u8(struct spi_slave *slave, u8 val)
 	int ret = 0;
 
 	ret = spi_xfer(slave, 8, val, NULL,
-		       SPI_XFER_BEGIN);
+		       SPI_XFER_BEGIN|SPI_XFER_END);
 	if (ret){
 		printf("%s: Failed to send: %d\n", __func__, ret);
 	}
