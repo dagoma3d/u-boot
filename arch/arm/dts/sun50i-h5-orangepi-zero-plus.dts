@@ -136,8 +136,8 @@
 		spi-cpha;
 		power-on-delay = <10>;
 		enable-gpios = <&pio 0 6 GPIO_ACTIVE_HIGH>;
-		dc = <&pio 0 7 GPIO_ACTIVE_HIGH>;
-		reset = <&pio 0 2 GPIO_ACTIVE_HIGH>;
+		dc-gpios = <&pio 0 7 GPIO_ACTIVE_HIGH>;
+		reset-gpios = <&pio 0 2 GPIO_ACTIVE_HIGH>;
 	};
 };
 
