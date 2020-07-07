@@ -24,6 +24,7 @@ static int spi_set_speed_mode(struct udevice *bus, int speed, int mode)
 	struct dm_spi_ops *ops;
 	int ret;
 
+	printf("%s: Mode is %d\n",__func__,mode);
 	ops = spi_get_ops(bus);
 	if (ops->set_speed)
 		ret = ops->set_speed(bus, speed);
