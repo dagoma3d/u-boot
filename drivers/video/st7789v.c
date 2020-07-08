@@ -9676,8 +9676,6 @@ static void spi_write_u8_array(struct spi_slave *slave, struct gpio_desc *dc, u8
 {
 	int i = 0;
 
-	spi_set_wordlen(slave, 8);
-
 	dm_gpio_set_value(dc, 0);
 	udelay(10);
 	spi_write_u8(slave, buff[i]);
