@@ -9678,11 +9678,11 @@ static void spi_write_u8_array(struct spi_slave *slave, struct gpio_desc *dc, u8
 
 	spi_set_wordlen(slave, 8);
 
-	gpio_set_value(dc, 0);
+	dm_gpio_set_value(dc, 0);
 	udelay(10);
 	spi_write_u8(slave, buff[i]);
 
-	gpio_set_value(dc, 1);
+	dm_gpio_set_value(dc, 1);
 	udelay(10);
 	for (i = 1; i < size; i++){
 		spi_write_u8(slave, buff[i]);
@@ -9693,11 +9693,11 @@ static void fbtft_reset(struct gpio_desc *reset)
 {
 	if (!gpio_is_valid(reset))
 		return;
-	gpio_set_value(reset, 1);
+	dm_gpio_set_value(reset, 1);
 	mdelay(120);
-	gpio_set_value(reset, 0);
+	dm_gpio_set_value(reset, 0);
 	mdelay(40);
-	gpio_set_value(reset, 1);
+	dm_gpio_set_value(reset, 1);
 	mdelay(120);
 }
 
@@ -9708,11 +9708,11 @@ static void init_display(struct spi_slave *slave, struct udevice *dev)
 
 	fbtft_reset(&priv->reset);
 
-	gpio_set_value(&priv->dc, 0);
+	dm_gpio_set_value(&priv->dc, 0);
 	udelay(10);
 	/* turn off sleep mode */
 	spi_write_u8(slave, MIPI_DCS_EXIT_SLEEP_MODE);
-	gpio_set_value(&priv->dc, 1);
+	dm_gpio_set_value(&priv->dc, 1);
 	mdelay(120);
 
 	/* set pixel format to RGB-565 : 65K colors */
@@ -9805,13 +9805,13 @@ static void init_display(struct spi_slave *slave, struct udevice *dev)
 	spi_write_u8_array(slave,&priv->dc, _pwctrl1,
 			ARRAY_SIZE(_pwctrl1));
 
-	gpio_set_value(&priv->dc, 0);
+	dm_gpio_set_value(&priv->dc, 0);
 	udelay(10);
 	spi_write_u8(slave, MIPI_DCS_SET_DISPLAY_ON);
 
 	if (HSD20_IPS)
 		spi_write_u8(slave, MIPI_DCS_ENTER_INVERT_MODE);
-	gpio_set_value(&priv->dc, 1);
+	dm_gpio_set_value(&priv->dc, 1);
 	udelay(10);
 }
 
@@ -9842,9 +9842,9 @@ static void fbtft_set_addr_win(struct spi_slave *slave, struct udevice *dev, int
 	spi_write_u8_array(slave,&priv->dc, _raset,
 				ARRAY_SIZE(_raset));
 
-	// gpio_set_value(&priv->dc, 0);
+	// dm_gpio_set_value(&priv->dc, 0);
 	// spi_write_u8(slave, MIPI_DCS_WRITE_MEMORY_START);
-	// gpio_set_value(&priv->dc, 1);
+	// dm_gpio_set_value(&priv->dc, 1);
 }
 
 /**
@@ -9876,7 +9876,7 @@ static void update_display(struct spi_slave *slave, struct udevice *dev)
 	fbtft_set_addr_win(slave, dev, 0, 0,
 			240 - 1, 320 - 1);
 
-	gpio_set_value(&priv->enable, 1);
+	dm_gpio_set_value(&priv->enable, 1);
 	
 	spi_write_u8_array(slave, &priv->dc, data,
 			ARRAY_SIZE(data));
@@ -9986,7 +9986,7 @@ static int st7789v_lcd_enable(struct udevice *dev, int bpp,
 	struct st7789v_lcd_priv *priv = dev_get_priv(dev);
 	int ret = 0;
 
-	gpio_set_value(&priv->enable, 1);
+	dm_gpio_set_value(&priv->enable, 1);
 
 	mdelay(priv->power_on_delay);
 	st7789v_spi_startup(slave);
