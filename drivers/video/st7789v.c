@@ -9689,7 +9689,7 @@ static void spi_write_u8_array(struct spi_slave *slave, struct gpio_desc *dc, u8
 
 static void fbtft_reset(struct gpio_desc *reset)
 {
-	if (!gpio_is_valid(reset))
+	if (!reset))
 		return;
 	dm_gpio_set_value(reset, 1);
 	mdelay(120);
