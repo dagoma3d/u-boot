@@ -9731,7 +9731,7 @@ static struct st7789v_seq_entry init_seq[] = {
 	{{VCMOFSET,_vcmofset,ARRAY_SIZE(_vcmofset)},0},								/* VCOM offset = 0V */
 	{{PWCTRL1,_pwctrl1,ARRAY_SIZE(_pwctrl1)},0}, 								/* AVDD = 6.8V AVCL = -4.8V VDS = 2.3V */
 	{{MIPI_DCS_SET_DISPLAY_ON,NULL,0},0},
-	// HSD20_IPS ? {{MIPI_DCS_ENTER_INVERT_MODE,NULL,0},0} :,
+	{{MIPI_DCS_ENTER_INVERT_MODE,NULL,0},0}, 									//HSD20_IPS ? {{MIPI_DCS_ENTER_INVERT_MODE,NULL,0},0} : NULL,
 };
 
 static struct st7789v_seq_entry addr_seq[] = {
@@ -9750,20 +9750,18 @@ static struct st7789v_seq_entry data_seq[] = {
 #define MADCTL_MY BIT(7) /* bitmask for page address order */
 
 
-static int spi_transfer(struct spi_slave *spi, struct st7789v_cmd *cmd)
+static int spi_transfer(struct spi_slave *spi, struct udevice *dev, struct st7789v_cmd *cmd)
 {
 	int i, error;
 	u8 command = cmd->cmd;
 	u8 msg;
+	struct st7789v_lcd_priv *priv = dev_get_priv(dev);
 
-	// error = spi_set_wordlen(spi, 8);
-	// if (error)
-	// 	return error;
-
+	dm_gpio_set_value(&priv->dc,0);
 	error = spi_xfer(spi, 8, &command, NULL, SPI_XFER_ONCE);
 	if (error)
 		return error;
-
+	dm_gpio_set_value(&priv->dc,1);
 	for (i = 0; i < cmd->count; i++) {
 		msg = cmd->params[i];
 		error = spi_xfer(spi, 8, &msg, NULL, SPI_XFER_ONCE);
@@ -9794,7 +9792,7 @@ static void init_display(struct spi_slave *slave, struct udevice *dev)
 	reset_display(&priv->reset);
 
 	for (int i = 0; i < ARRAY_SIZE(init_seq); i++) {
-		if (spi_transfer(slave, &init_seq[i].cmd) < 0)
+		if (spi_transfer(slave, dev, &init_seq[i].cmd) < 0)
 			puts("SPI transfer failed\n");
 
 		mdelay(init_seq[i].delay_ms);
@@ -9809,7 +9807,7 @@ static void set_addr_win(struct spi_slave *slave, struct udevice *dev, int xs, i
 	printf("%s: Setting addr... \n", __func__);
 	
 	for (int i = 0; i < ARRAY_SIZE(addr_seq); i++) {
-		if (spi_transfer(slave, &addr_seq[i].cmd) < 0)
+		if (spi_transfer(slave, dev, &addr_seq[i].cmd) < 0)
 			puts("SPI transfer failed\n");
 
 		mdelay(addr_seq[i].delay_ms);
@@ -9828,7 +9826,7 @@ static void update_display(struct spi_slave *slave, struct udevice *dev)
 	dm_gpio_set_value(&priv->enable, 1);
 	
 	for (int i = 0; i < ARRAY_SIZE(data_seq); i++) {
-		if (spi_transfer(slave, &data_seq[i].cmd) < 0)
+		if (spi_transfer(slave, dev, &data_seq[i].cmd) < 0)
 			puts("SPI transfer failed\n");
 
 		mdelay(data_seq[i].delay_ms);
