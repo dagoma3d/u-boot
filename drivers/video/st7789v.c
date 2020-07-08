@@ -22,7 +22,7 @@
 #define HSD20_IPS 1
 
 static u8 data[] = {
-	MIPI_DCS_WRITE_MEMORY_START, 0x42, 0x4D, 0x42, 0x58, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x42, 0x00, 0x00, 0x00, 0x28, 0x00, 
+	0x42, 0x4D, 0x42, 0x58, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x42, 0x00, 0x00, 0x00, 0x28, 0x00, 
 	0x00, 0x00, 0xF0, 0x00, 0x00, 0x00, 0x40, 0x01, 0x00, 0x00, 0x01, 0x00, 0x10, 0x00, 0x03, 0x00, 
 	0x00, 0x00, 0x42, 0x58, 0x02, 0x00, 0x25, 0x16, 0x00, 0x00, 0x25, 0x16, 0x00, 0x00, 0x00, 0x00, 
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xF8, 0x00, 0x00, 0xE0, 0x07, 0x00, 0x00, 0x1F, 0x00, 
@@ -9652,44 +9652,131 @@ struct st7789v_lcd_priv {
 	u32 power_on_delay;
 };
 
+struct st7789v_cmd {
+	u8 cmd;
+	u8 *params;
+	int count;
+};
+
+struct st7789v_seq_entry {
+	struct st7789v_cmd cmd;
+	int delay_ms;
+};
+
+static u8 _pixel_format[] = {
+	MIPI_DCS_PIXEL_FMT_16BIT,
+};
+
+static u8 _portctrl[] = {
+	HSD20_IPS ? 0x05 : 0x08, 
+	HSD20_IPS ? 0x05 : 0x08, 
+	0x00, 
+	HSD20_IPS ? 0x33 : 0x22, 
+	HSD20_IPS ? 0x33 : 0x22,
+};
+
+static u8 _gctrl[] = {
+	HSD20_IPS ? 0x75 : 0x35,
+};
+
+static u8 _vdvvrhen[] = {
+	0x01, 
+	0xFF,
+};
+
+static u8 _vrhs[] = {
+	HSD20_IPS ? 0x13 : 0x0B,
+};
+
+static u8 _vdvs[] = {
+	0x20,
+};
+
+static u8 _vcoms[] = {
+	HSD20_IPS ? 0x22: 0x20,
+};
+
+static u8 _vcmofset[] = {
+	0x20,
+};
+
+static u8 _pwctrl1[] = {
+	0xA4,
+	0xA1,
+};
+
+static u8 _caset[] = {
+	0x00, 
+	0x00,
+	0x01,
+	0x9F,
+};
+
+static u8 _raset[] = { 
+	0x00, 
+	0x00,
+	0x00, 
+	0xEF,
+};
+
+static struct st7789v_seq_entry init_seq[] = {
+	{{MIPI_DCS_EXIT_SLEEP_MODE,NULL,0},120},									/* turn off sleep mode */
+	{{MIPI_DCS_SET_PIXEL_FORMAT,_pixel_format,ARRAY_SIZE(_pixel_format)},0},	/* set pixel format to RGB-565 : 65K colors */
+	{{PORCTRL,_portctrl,ARRAY_SIZE(_portctrl)},0}, 
+	{{GCTRL,_gctrl,ARRAY_SIZE(_gctrl),},0},										/* VGH = 13.26V, VGL = -10.43V */
+	{{VDVVRHEN,_vdvvrhen,ARRAY_SIZE(_vdvvrhen)},0}, 							/* VDV and VRH register values come from command write (instead of NVM) */
+	{{VRHS,_vrhs,ARRAY_SIZE(_vrhs)},0},											/* VAP =  4.1V + (VCOM + VCOM offset + 0.5 * VDV) VAN = -4.1V + (VCOM + VCOM offset + 0.5 * VDV) */
+	{{VDVS,_vdvs,ARRAY_SIZE(_vdvs)},0},											/* VDV = 0V */
+	{{VCOMS,_vcoms,ARRAY_SIZE(_vcoms)},0}, 										/* VCOM = 0.9V */
+	{{VCMOFSET,_vcmofset,ARRAY_SIZE(_vcmofset)},0},								/* VCOM offset = 0V */
+	{{PWCTRL1,_pwctrl1,ARRAY_SIZE(_pwctrl1)},0}, 								/* AVDD = 6.8V AVCL = -4.8V VDS = 2.3V */
+	{{MIPI_DCS_SET_DISPLAY_ON,NULL,0},0},
+	// HSD20_IPS ? {{MIPI_DCS_ENTER_INVERT_MODE,NULL,0},0} :,
+};
+
+static struct st7789v_seq_entry addr_seq[] = {
+	{{MIPI_DCS_SET_COLUMN_ADDRESS, _caset, ARRAY_SIZE(_caset)},0},
+	{{MIPI_DCS_SET_PAGE_ADDRESS,_raset, ARRAY_SIZE(_raset)},0},
+};
+
+static struct st7789v_seq_entry data_seq[] = {
+	{{MIPI_DCS_WRITE_MEMORY_START, data, ARRAY_SIZE(data)},0},
+};
+
+
 #define MADCTL_BGR BIT(3) /* bitmask for RGB/BGR order */
 #define MADCTL_MV BIT(5) /* bitmask for page/column order */
 #define MADCTL_MX BIT(6) /* bitmask for column address order */
 #define MADCTL_MY BIT(7) /* bitmask for page address order */
 
 
-static int spi_write_u8(struct spi_slave *slave, u8 val)
+static int spi_transfer(struct spi_slave *spi, struct st7789v_cmd *cmd)
 {
-	//unsigned short buf8 = htons(val);
-	int ret = 0;
+	int i, error;
+	u8 command = cmd->cmd;
+	u8 msg;
 
-	ret = spi_xfer(slave, 8, val, NULL,
-		       SPI_XFER_BEGIN|SPI_XFER_END);
-	if (ret){
-		printf("%s: Failed to send: %d\n", __func__, ret);
+	// error = spi_set_wordlen(spi, 8);
+	// if (error)
+	// 	return error;
+
+	error = spi_xfer(spi, 8, &command, NULL, SPI_XFER_ONCE);
+	if (error)
+		return error;
+
+	for (i = 0; i < cmd->count; i++) {
+		msg = cmd->params[i];
+		error = spi_xfer(spi, 8, &msg, NULL, SPI_XFER_ONCE);
+		if (error)
+			return error;
 	}
-	return ret;
+
+	return 0;
 }
 
-static void spi_write_u8_array(struct spi_slave *slave, struct gpio_desc *dc, u8 *buff,
-					int size)
+static void reset_display(struct gpio_desc *reset)
 {
-	int i = 0;
-
-	dm_gpio_set_value(dc, 0);
-	udelay(10);
-	spi_write_u8(slave, buff[i]);
-
-	dm_gpio_set_value(dc, 1);
-	udelay(10);
-	for (i = 1; i < size; i++){
-		spi_write_u8(slave, buff[i]);
-	}
-}
-
-static void fbtft_reset(struct gpio_desc *reset)
-{
-	if (!reset))
+	if (!reset)
 		return;
 	dm_gpio_set_value(reset, 1);
 	mdelay(120);
@@ -9704,165 +9791,29 @@ static void init_display(struct spi_slave *slave, struct udevice *dev)
 	struct st7789v_lcd_priv *priv = dev_get_priv(dev);
 	printf("%s: Init display... \n", __func__);
 
-	fbtft_reset(&priv->reset);
+	reset_display(&priv->reset);
 
-	dm_gpio_set_value(&priv->dc, 0);
-	udelay(10);
-	/* turn off sleep mode */
-	spi_write_u8(slave, MIPI_DCS_EXIT_SLEEP_MODE);
-	dm_gpio_set_value(&priv->dc, 1);
-	mdelay(120);
+	for (int i = 0; i < ARRAY_SIZE(init_seq); i++) {
+		if (spi_transfer(slave, &init_seq[i].cmd) < 0)
+			puts("SPI transfer failed\n");
 
-	/* set pixel format to RGB-565 : 65K colors */
-	static u8 _pixel_format[] = {
-	  MIPI_DCS_SET_PIXEL_FORMAT,
-	  MIPI_DCS_PIXEL_FMT_16BIT,
-	};
-	spi_write_u8_array(slave,&priv->dc, _pixel_format,
-				    ARRAY_SIZE(_pixel_format));
-	
-	static u8 _portctrl[] = {
-		PORCTRL, 
-		HSD20_IPS ? 0x05 : 0x08, 
-		HSD20_IPS ? 0x05 : 0x08, 
-		0x00, 
-		HSD20_IPS ? 0x33 : 0x22, 
-		HSD20_IPS ? 0x33 : 0x22,
-	};
+		mdelay(init_seq[i].delay_ms);
+	}
 
-	spi_write_u8_array(slave,&priv->dc, _portctrl,
-				ARRAY_SIZE(_portctrl));
-
-	/*
-	 * VGH = 13.26V
-	 * VGL = -10.43V
-	 */
-	static u8 _gctrl[] = {
-		GCTRL, 
-		HSD20_IPS ? 0x75 : 0x35,
-	};
-	spi_write_u8_array(slave,&priv->dc, _gctrl,
-				ARRAY_SIZE(_gctrl));
-
-	/*
-	 * VDV and VRH register values come from command write
-	 * (instead of NVM)
-	 */
-	static u8 _vdvvrhen[] = {
-		VDVVRHEN, 
-		0x01, 
-		0xFF,
-	};
-	spi_write_u8_array(slave,&priv->dc, _vdvvrhen,
-				ARRAY_SIZE(_vdvvrhen));
-	/*
-	 * VAP =  4.1V + (VCOM + VCOM offset + 0.5 * VDV)
-	 * VAN = -4.1V + (VCOM + VCOM offset + 0.5 * VDV)
-	 */
-	static u8 _vrhs[] = {
-		VRHS, 
-		HSD20_IPS ? 0x13 : 0x0B,
-	};
-	spi_write_u8_array(slave,&priv->dc, _vrhs,
-			ARRAY_SIZE(_vrhs));
-
-	/* VDV = 0V */
-	static u8 _vdvs[] = {
-		VDVS, 
-		0x20,
-	};
-	spi_write_u8_array(slave,&priv->dc, _vdvs,
-			ARRAY_SIZE(_vdvs));
-
-	/* VCOM = 0.9V */
-	static u8 _vcoms[] = {
-		VCOMS, 
-		HSD20_IPS ? 0x22: 0x20,
-	};
-	spi_write_u8_array(slave, &priv->dc,_vcoms,
-			ARRAY_SIZE(_vcoms));
-
-	/* VCOM offset = 0V */
-	static u8 _vcmofset[] = {
-		VCMOFSET, 
-		0x20,
-	};
-	spi_write_u8_array(slave, &priv->dc, _vcmofset,
-			ARRAY_SIZE(_vcmofset));
-
-	/*
-	 * AVDD = 6.8V
-	 * AVCL = -4.8V
-	 * VDS = 2.3V
-	 */
-	static u8 _pwctrl1[] = {
-		PWCTRL1, 
-		0xA4,
-		0xA1,
-	};
-	spi_write_u8_array(slave,&priv->dc, _pwctrl1,
-			ARRAY_SIZE(_pwctrl1));
-
-	dm_gpio_set_value(&priv->dc, 0);
-	udelay(10);
-	spi_write_u8(slave, MIPI_DCS_SET_DISPLAY_ON);
-
-	if (HSD20_IPS)
-		spi_write_u8(slave, MIPI_DCS_ENTER_INVERT_MODE);
-	dm_gpio_set_value(&priv->dc, 1);
-	udelay(10);
 }
 
-static void fbtft_set_addr_win(struct spi_slave *slave, struct udevice *dev, int xs, int ys, int xe,
+static void set_addr_win(struct spi_slave *slave, struct udevice *dev, int xs, int ys, int xe,
 			       int ye)
 {
 	struct st7789v_lcd_priv *priv = dev_get_priv(dev);
 	printf("%s: Setting addr... \n", __func__);
-	static u8 _caset[] = {
-		MIPI_DCS_SET_COLUMN_ADDRESS, 
-		0x00, 
-		0x00,
-		0x01,
-		0x9F,
-	};
+	
+	for (int i = 0; i < ARRAY_SIZE(addr_seq); i++) {
+		if (spi_transfer(slave, &addr_seq[i].cmd) < 0)
+			puts("SPI transfer failed\n");
 
-	spi_write_u8_array(slave, &priv->dc, _caset,
-				ARRAY_SIZE(_caset));
-
-	static u8 _raset[] = {
-		MIPI_DCS_SET_COLUMN_ADDRESS, 
-		0x00, 
-		0x00,
-		0x00, 
-		0xEF,
-	};
-
-	spi_write_u8_array(slave,&priv->dc, _raset,
-				ARRAY_SIZE(_raset));
-
-	// dm_gpio_set_value(&priv->dc, 0);
-	// spi_write_u8(slave, MIPI_DCS_WRITE_MEMORY_START);
-	// dm_gpio_set_value(&priv->dc, 1);
-}
-
-/**
- * set_var() - apply LCD properties like rotation and BGR mode
- *
- * @par: FBTFT parameter object
- *
- * Return: 0 on success, < 0 if error occurred.
- */
-static int set_var(struct spi_slave *slave, struct udevice *dev)
-{
-	struct st7789v_lcd_priv *priv = dev_get_priv(dev);
-
-	static u8 _madctl_par[] = {
-		MIPI_DCS_SET_ADDRESS_MODE, 
-		0x00, 
-	};
-
-	spi_write_u8_array(slave,&priv->dc, _madctl_par, ARRAY_SIZE(_madctl_par));
-	return 0;
+		mdelay(addr_seq[i].delay_ms);
+	}
 }
 
 /* Inspired from fbtft_update_display function */
@@ -9871,27 +9822,21 @@ static void update_display(struct spi_slave *slave, struct udevice *dev)
 	struct st7789v_lcd_priv *priv = dev_get_priv(dev);
 	printf("%s: Updating display... \n", __func__);
 
-	fbtft_set_addr_win(slave, dev, 0, 0,
+	set_addr_win(slave, dev, 0, 0,
 			240 - 1, 320 - 1);
 
 	dm_gpio_set_value(&priv->enable, 1);
 	
-	spi_write_u8_array(slave, &priv->dc, data,
-			ARRAY_SIZE(data));
+	for (int i = 0; i < ARRAY_SIZE(data_seq); i++) {
+		if (spi_transfer(slave, &data_seq[i].cmd) < 0)
+			puts("SPI transfer failed\n");
+
+		mdelay(data_seq[i].delay_ms);
+	}
 }
 
 static int st7789v_spi_startup(struct spi_slave *slave)
 {
-	// int ret;
-
-	// ret = spi_claim_bus(slave);
-	// if (ret){
-	// 	printf("%s: Failed to claim bus: %d\n", __func__, ret);
-	// 	return ret;
-	// }
-	// init_display(slave);
-
-	// spi_release_bus(slave);
 	return 0;
 }
 
@@ -9908,7 +9853,6 @@ static int display_logo(struct spi_slave *slave, struct udevice *dev)
 	}
 
 	init_display(slave,dev);
-	set_var(slave,dev);
 	update_display(slave,dev);
 
 	spi_release_bus(slave);
