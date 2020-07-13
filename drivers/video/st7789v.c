@@ -9705,18 +9705,22 @@ static u8 _pwctrl1[] = {
 	0xA1,
 };
 
+static u8 _madctl[] = {
+	0x00,
+};
+
 static u8 _caset[] = {
 	0x00, 
 	0x00,
-	0x01,
-	0x9F,
+	0x00,
+	0xEF,
 };
 
 static u8 _raset[] = { 
 	0x00, 
 	0x00,
-	0x00, 
-	0xEF,
+	0x01, 
+	0x3F,
 };
 
 static struct st7789v_seq_entry init_seq[] = {
@@ -9735,6 +9739,7 @@ static struct st7789v_seq_entry init_seq[] = {
 };
 
 static struct st7789v_seq_entry addr_seq[] = {
+	{{MIPI_DCS_SET_ADDRESS_MODE, _madctl, ARRAY_SIZE(_madctl)},0},
 	{{MIPI_DCS_SET_COLUMN_ADDRESS, _caset, ARRAY_SIZE(_caset)},0},
 	{{MIPI_DCS_SET_PAGE_ADDRESS,_raset, ARRAY_SIZE(_raset)},0},
 };
@@ -9800,8 +9805,7 @@ static void init_display(struct spi_slave *slave, struct udevice *dev)
 
 }
 
-static void set_addr_win(struct spi_slave *slave, struct udevice *dev, int xs, int ys, int xe,
-			       int ye)
+static void set_addr_win(struct spi_slave *slave, struct udevice *dev)
 {
 	struct st7789v_lcd_priv *priv = dev_get_priv(dev);
 	printf("%s: Setting addr... \n", __func__);
@@ -9820,8 +9824,7 @@ static void update_display(struct spi_slave *slave, struct udevice *dev)
 	struct st7789v_lcd_priv *priv = dev_get_priv(dev);
 	printf("%s: Updating display... \n", __func__);
 
-	set_addr_win(slave, dev, 0, 0,
-			240 - 1, 320 - 1);
+	set_addr_win(slave, dev);
 
 	dm_gpio_set_value(&priv->enable, 1);
 	
