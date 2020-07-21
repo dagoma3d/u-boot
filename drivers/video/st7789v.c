@@ -542,8 +542,6 @@ static void update_display(struct spi_slave *slave, struct udevice *dev)
 	printf("%s: Updating display... \n", __func__);
 
 	set_addr_win(slave, dev);
-
-	dm_gpio_set_value(&priv->enable, 1);
 	
 	for (int i = 0; i < ARRAY_SIZE(data_seq); i++) {
 		if (spi_transfer(slave, dev, &data_seq[i].cmd) < 0)
@@ -551,6 +549,8 @@ static void update_display(struct spi_slave *slave, struct udevice *dev)
 
 		mdelay(data_seq[i].delay_ms);
 	}
+
+	dm_gpio_set_value(&priv->enable, 1);
 }
 
 static int st7789v_spi_startup(struct spi_slave *slave)
@@ -615,6 +615,7 @@ U_BOOT_CMD(
 static int st7789v_bind(struct udevice *dev)
 {
 	printf("%s: binding\n", __func__);
+	do_sitronixset(NULL,NULL,NULL,NULL);
 	return 0;
 }
 
