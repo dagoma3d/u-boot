@@ -12,6 +12,7 @@
 #include <log.h>
 #include <dm/read.h>
 #include <dm/uclass-internal.h>
+#include <dm/device_compat.h>
 #include <errno.h>
 #include <spi.h>
 #include <asm/gpio.h>

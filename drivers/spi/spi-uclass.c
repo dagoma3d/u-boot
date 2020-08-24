@@ -20,11 +20,9 @@ DECLARE_GLOBAL_DATA_PTR;
 
 static int spi_set_speed_mode(struct udevice *bus, int speed, int mode)
 {
-	printf("%s: Setting speed mode ... \n", __func__);
 	struct dm_spi_ops *ops;
 	int ret;
 
-	printf("%s: Mode is %d\n",__func__,mode);
 	ops = spi_get_ops(bus);
 	if (ops->set_speed)
 		ret = ops->set_speed(bus, speed);
@@ -49,7 +47,6 @@ static int spi_set_speed_mode(struct udevice *bus, int speed, int mode)
 
 int dm_spi_claim_bus(struct udevice *dev)
 {
-	printf("%s: DM_SPI_CLAIMING... \n", __func__);
 	struct udevice *bus = dev->parent;
 	struct dm_spi_ops *ops = spi_get_ops(bus);
 	struct dm_spi_bus *spi = dev_get_uclass_priv(bus);
