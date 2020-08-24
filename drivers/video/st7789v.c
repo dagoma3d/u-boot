@@ -509,7 +509,7 @@ static void reset_display(struct gpio_desc *reset)
 static void init_display(struct spi_slave *slave, struct udevice *dev)
 {
 	struct st7789v_lcd_priv *priv = dev_get_priv(dev);
-	printf("%s: Init display... \n", __func__);
+	dev_dbg(dev, "%s: Init display... \n", __func__);
 
 	reset_display(&priv->reset);
 
@@ -525,7 +525,7 @@ static void init_display(struct spi_slave *slave, struct udevice *dev)
 static void set_addr_win(struct spi_slave *slave, struct udevice *dev)
 {
 	struct st7789v_lcd_priv *priv = dev_get_priv(dev);
-	printf("%s: Setting addr... \n", __func__);
+	dev_dbg(dev, "%s: Setting addr... \n", __func__);
 	
 	for (int i = 0; i < ARRAY_SIZE(addr_seq); i++) {
 		if (spi_transfer(slave, dev, &addr_seq[i].cmd) < 0)
@@ -539,7 +539,7 @@ static void set_addr_win(struct spi_slave *slave, struct udevice *dev)
 static void update_display(struct spi_slave *slave, struct udevice *dev)
 {
 	struct st7789v_lcd_priv *priv = dev_get_priv(dev);
-	printf("%s: Updating display... \n", __func__);
+	dev_dbg(dev, "%s: Updating display... \n", __func__);
 
 	set_addr_win(slave, dev);
 	
@@ -560,13 +560,13 @@ static int st7789v_spi_startup(struct spi_slave *slave)
 
 static int display_logo(struct spi_slave *slave, struct udevice *dev)
 {
-	printf("%s: Displaying Logo \n", __func__);
+	dev_dbg(dev, "%s: Displaying Logo \n", __func__);
 	int ret;
 
 	ret = spi_claim_bus(slave);
-	printf("%s: claim bus value: %d\n", __func__,ret);
+	dev_dbg(dev, "%s: claim bus value: %d\n", __func__,ret);
 	if (ret){
-		printf("%s: Failed to claim bus: %d\n", __func__, ret);
+		dev_err(dev, "%s: Failed to claim bus: %d\n", __func__, ret);
 		return ret;
 	}
 
@@ -587,19 +587,19 @@ static int do_sitronixset(struct cmd_tbl *cmdtp, int flag, int argc,
 	ret = uclass_get_device_by_driver(UCLASS_VIDEO_CONSOLE,
 					  DM_GET_DRIVER(st7789v_lcd), &dev);
 	if (ret) {
-		printf("%s: Could not get st7789v device\n", __func__);
+		dev_err(dev, "%s: Could not get st7789v device\n", __func__);
 		return ret;
 	}
 	
 	slave = dev_get_parent_priv(dev);
 
 	if (!slave) {
-		printf("%s: No slave data\n", __func__);
+		dev_err(dev, "%s: No slave data\n", __func__);
 		return -ENODEV;
 	}
 	ret = display_logo(slave,dev);
 	if (ret) {
-		printf("%s: Could not display logo\n", __func__);
+		dev_err(dev, "%s: Could not display logo\n", __func__);
 		return ret;
 	}
 
@@ -614,14 +614,14 @@ U_BOOT_CMD(
 
 static int st7789v_bind(struct udevice *dev)
 {
-	printf("%s: binding\n", __func__);
+	dev_dbg(dev, "%s: binding\n", __func__);
 	do_sitronixset(NULL,NULL,NULL,NULL);
 	return 0;
 }
 
 static int st7789v_probe(struct udevice *dev)
 {
-	printf("%s: probing\n", __func__);
+	dev_dbg(dev, "%s: probing\n", __func__);
 	return 0;
 }
 
